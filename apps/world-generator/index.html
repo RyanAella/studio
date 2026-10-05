@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🌍 Prozeduraler Weltengenerator</title>
+    <style>
+      :root {
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        color: #1e293b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(#dbeafe, #ecfdf5 45%, #fffbeb);
+        min-height: 100vh;
+      }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+      header { text-align: center; margin-bottom: 24px; }
+      h1 { margin: 0; font-size: 2rem; color: #065f46; letter-spacing: -0.02em; }
+      header p { color: #475569; max-width: 640px; margin: 8px auto 0; }
+      .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+      @media (min-width: 900px) { .grid { grid-template-columns: 1fr 340px; } }
+
+      .steps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+      .stepbtn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px; border-radius: 999px; border: 2px solid #e2e8f0;
+        background: #fff; color: #475569; font-weight: 600; font-size: 0.9rem;
+        cursor: pointer; transition: all .15s;
+      }
+      .stepbtn:hover { border-color: #6ee7b7; }
+      .stepbtn.active {
+        background: #059669; color: #fff; border-color: #047857;
+        box-shadow: 0 4px 10px rgba(5,150,105,.35); transform: scale(1.05);
+      }
+
+      .viewtoggle { display: flex; gap: 8px; margin-bottom: 10px; }
+      .viewbtn {
+        padding: 7px 16px; border-radius: 10px; border: 2px solid #e2e8f0;
+        background: #fff; color: #475569; font-weight: 700; cursor: pointer; font-size: .9rem;
+      }
+      .viewbtn.active { background: #0284c7; color: #fff; border-color: #0369a1; }
+
+      .card {
+        background: #fff; border-radius: 16px; border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 14px rgba(0,0,0,.07); padding: 18px;
+      }
+      canvas.map { width: 100%; height: auto; border-radius: 12px; display: block; }
+      #map3d { aspect-ratio: 3 / 2; cursor: grab; touch-action: none; }
+      #map3d.dragging { cursor: grabbing; }
+
+      .ctrlhint {
+        margin-top: 10px; padding: 8px 12px; border-radius: 10px; font-size: .85rem;
+        background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af;
+      }
+      .expl { margin-top: 16px; }
+      .expl .row { display: flex; gap: 16px; align-items: flex-start; }
+      .expl .icon { font-size: 2.4rem; line-height: 1; }
+      .expl h2 { margin: 0; font-size: 1.15rem; }
+      .expl p { margin: 6px 0 0; color: #475569; line-height: 1.6; }
+      .task {
+        margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a;
+        border-radius: 12px; padding: 10px 14px; color: #92400e; font-size: .95rem;
+      }
+      .task strong { color: #b45309; }
+      .next {
+        margin-top: 14px; float: right; padding: 10px 20px; border: none;
+        border-radius: 12px; background: #059669; color: #fff; font-weight: 700;
+        cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+      }
+      .next:hover { background: #047857; }
+      .done {
+        margin-top: 14px; float: right; padding: 10px 20px;
+        background: #d1fae5; color: #065f46; font-weight: 700; border-radius: 12px;
+      }
+      .cleared::after { content: ""; display: table; clear: both; }
+
+      aside .card { margin-bottom: 16px; }
+      h3 { margin: 0 0 12px; font-size: 1rem; }
+      .seedrow { display: flex; gap: 8px; }
+      input[type=number] {
+        flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid #cbd5e1;
+        border-radius: 10px; font-weight: 700; color: #047857; font-size: 1rem;
+      }
+      input[type=number]:focus { outline: 2px solid #34d399; }
+      .dice {
+        padding: 8px 14px; border: none; border-radius: 10px; background: #6366f1;
+        color: #fff; font-weight: 700; cursor: pointer; white-space: nowrap;
+      }
+      .dice:hover { background: #4f46e5; }
+      .hint { font-size: .75rem; color: #64748b; margin-top: 8px; line-height: 1.5; }
+
+      .slider { margin-bottom: 16px; }
+      .slider .top { display: flex; justify-content: space-between; align-items: baseline; }
+      .slider label { font-weight: 600; font-size: .85rem; color: #334155; }
+      .slider .val { font-size: .75rem; font-weight: 700; color: #047857; }
+      input[type=range] { width: 100%; accent-color: #059669; margin-top: 4px; }
+      .slider .sub { font-size: .7rem; color: #64748b; margin-top: 2px; }
+
+      .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+      .legend div { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #475569; }
+      .legend span.sw { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #cbd5e1; }
+
+      ul.counts { margin: 0; padding-left: 18px; font-size: .9rem; color: #475569; line-height: 1.8; }
+      .brain { background: #eef2ff; border-color: #c7d2fe; }
+      .brain h3 { color: #312e81; }
+      .brain p { font-size: .88rem; color: rgba(49,46,129,.85); line-height: 1.6; margin: 0; }
+      details summary { font-weight: 700; cursor: pointer; color: #1e293b; }
+      details .inner { margin-top: 12px; font-size: .88rem; color: #475569; line-height: 1.6; }
+      details .inner p, details .inner ul { margin: 0 0 10px; }
+      details ul { padding-left: 20px; }
+      footer { text-align: center; font-size: .75rem; color: #94a3b8; margin-top: 32px; }
+
+      .clickmsg {
+        margin-top: 10px; padding: 8px 12px; border-radius: 10px; font-size: .85rem;
+        background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; line-height: 1.5;
+      }
+      .clickmsg.ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+      .clickmsg.bad { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+      .autofox {
+        margin-top: 10px; padding: 7px 12px; border: none; border-radius: 10px;
+        background: #6366f1; color: #fff; font-weight: 700; cursor: pointer; font-size: .8rem;
+      }
+      .autofox:hover { background: #4f46e5; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>🌍 Prozeduraler Weltengenerator</h1>
+        <p>
+          Wie erschafft der Computer ganze Landschaften aus nichts als
+          <strong>einer Zahl und ein paar Regeln</strong>? Baue deine eigene Welt – Schritt für
+          Schritt, von der flachen Karte bis zur drehbaren 3D-Welt. Für Entdeckerinnen und
+          Entdecker ab 8 Jahren. 🦊🐰
+        </p>
+      </header>
+
+      <div class="grid">
+        <div>
+          <div class="steps" id="steps"></div>
+          <div class="viewtoggle">
+            <button class="viewbtn active" id="btn2d">🗺️ 2D-Karte</button>
+            <button class="viewbtn" id="btn3d">🌍 3D-Welt</button>
+          </div>
+          <div class="card" style="padding:10px">
+            <canvas class="map" id="map" width="768" height="512"></canvas>
+            <canvas class="map hidden" id="map3d"></canvas>
+            <div class="ctrlhint hidden" id="ctrlHint">
+              🖱️ <strong>Ziehen</strong> = Welt drehen · <strong>Mausrad</strong> = zoomen ·
+              <strong>Klick</strong> (ab Schritt 5) = Fuchs selbst platzieren!
+            </div>
+            <div class="clickmsg hidden" id="clickMsg"></div>
+          </div>
+          <div class="card expl">
+            <div class="row">
+              <div class="icon" id="explIcon">🎲</div>
+              <div>
+                <h2 id="explTitle"></h2>
+                <p id="explText"></p>
+                <div class="task" id="explTask"></div>
+              </div>
+            </div>
+            <div class="cleared"><div id="nextArea"></div></div>
+          </div>
+        </div>
+
+        <aside>
+          <div class="card">
+            <h3>🎲 Der Seed – deine Zauberzahl</h3>
+            <div class="seedrow">
+              <input type="number" id="seedInput" value="1337" min="1" />
+              <button class="dice" id="dice">🎲 Neue Welt</button>
+            </div>
+            <p class="hint">
+              Merk dir eine Zahl und tippe sie später nochmal ein – die Welt sieht exakt gleich
+              aus! Genau so funktionieren die Welt-Codes in Minecraft.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>🎛️ Die Regler</h3>
+            <div class="slider">
+              <div class="top"><label>Hügel-Größe (Wellen-Länge)</label><span class="val" id="vFreq"></span></div>
+              <input type="range" id="sFreq" min="4" max="24" step="1" value="9" />
+              <div class="sub">links = riesige Gebirge · rechts = viele kleine Kuppen</div>
+            </div>
+            <div class="slider">
+              <div class="top"><label>Hügel-Höhe</label><span class="val" id="vAmp"></span></div>
+              <input type="range" id="sAmp" min="0.3" max="2.6" step="0.1" value="1.3" />
+              <div class="sub">wie steil die Berge aus dem Boden wachsen</div>
+            </div>
+            <div class="slider">
+              <div class="top"><label>Wasserstand</label><span class="val" id="vWater"></span></div>
+              <input type="range" id="sWater" min="0.2" max="0.65" step="0.01" value="0.42" />
+              <div class="sub">hoch = viele Seen und Inseln</div>
+            </div>
+            <div class="slider" style="margin-bottom:2px">
+              <div class="top"><label>Baum-Dichte 🌲</label><span class="val" id="vTree"></span></div>
+              <input type="range" id="sTree" min="0" max="1" step="0.05" value="0.55" />
+              <div class="sub">Regel: Bäume nur auf Wiese – nie im Wasser!</div>
+            </div>
+          </div>
+
+          <div class="card hidden" id="legendCard">
+            <h3>🗺️ Legende</h3>
+            <div class="legend" id="legend"></div>
+          </div>
+
+          <div class="card hidden" id="countsCard">
+            <h3>📊 Deine Welt in Zahlen</h3>
+            <ul class="counts" id="counts"></ul>
+            <button class="autofox hidden" id="autoFoxBtn">🎲 Fuchs wieder automatisch setzen</button>
+          </div>
+
+          <div class="card brain">
+            <h3>🧠 Warum heißt das „prozedural“?</h3>
+            <p>
+              <strong>Prozedural</strong> heißt: aus Regeln erzeugt. Niemand hat diese Welt per
+              Hand gezeichnet – sie entsteht aus <strong>einer Zahl (Seed)</strong> und
+              <strong>wenigen Regeln</strong> (Wellen, Wasser, Farben, Bewohner). Gleicher Seed →
+              gleiche Welt. Neuer Seed → ganz neue Welt. So erschaffen Spiele wie Minecraft
+              Milliarden Welten, ohne dass jemand jede einzeln bauen muss!
+            </p>
+          </div>
+
+          <details class="card">
+            <summary>👩‍🏫 Für Erwachsene &amp; Lehrkräfte: Ablauf &amp; Quiz</summary>
+            <div class="inner">
+              <p><strong>Zeitrahmen:</strong> ca. 20–30 Minuten (5 Stationen à 3–5 Min + freies Experimentieren). Geeignet ab 8 Jahren, auch ohne Vorwissen.</p>
+              <p><strong>Ablauf:</strong> Einstieg mit einer Frage: „Glaubt ihr, in Minecraft hat jemand jede Welt per Hand gebaut?“ Dann die 5 Schritte gemeinsam durchklicken – Kinder jeweils erst raten lassen, was passiert, bevor der Regler bewegt wird. Ab Schritt 4 in die 3D-Ansicht wechseln: dieselbe Welt, diesmal als Landschaft zum Drehen!</p>
+              <p><strong>Abschluss-Quiz:</strong></p>
+              <ul>
+                <li>Was passiert, wenn man denselben Seed nochmal eintippt? <em>(Exakt dieselbe Welt – Zufall mit Gedächtnis!)</em></li>
+                <li>Warum wachsen keine Bäume im Wasser? <em>(Die Regel erlaubt nur Wiese als Baum-Platz.)</em></li>
+                <li>Welche zwei „Zutaten“ braucht prozedurales Terrain? <em>(Eine Zahl + Regeln.)</em></li>
+                <li>Was ändert sich in der 3D-Welt, wenn du den Wasserstand erhöhst? <em>(Die Seen steigen und überfluten Strand und Wiesen.)</em></li>
+              </ul>
+              <p><strong>Transfer:</strong> Das Gleiche steckt hinter Minecraft, No Man's Sky und den Landschaften in 3D-Programmen – dort wird das 2D-Höhenbild in ein 3D-Gelände aus Würfeln oder Polygonen umgesetzt. Ein Unity-Script dazu (identischer Seed!) gibt es ebenfalls in diesem Projekt.</p>
+            </div>
+          </details>
+        </aside>
+      </div>
+
+      <footer>Gebaut mit „Value Noise“ – derselben Grundidee wie Perlin Noise in echten Spielen. Die 3D-Welt läuft mit reinem WebGL, ganz ohne Bibliotheken. 🎮</footer>
+    </div>
+
+    <script>
+      var W = 96, H = 64, CELL = 8;
+
+      function mulberry32(a) {
+        return function () {
+          a |= 0; a = (a + 0x6d2b79f5) | 0;
+          var t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function smooth(t) { return t * t * (3 - 2 * t); }
+
+      function buildRaw(seed) {
+        var rng = mulberry32(seed * 31 + 7);
+        var arr = new Float32Array(W * H);
+        for (var i = 0; i < arr.length; i++) arr[i] = rng();
+        return arr;
+      }
+
+      function buildHeights(seed, freq, amp) {
+        var arr = new Float32Array(W * H);
+        var norm = 0, o, x, y;
+        for (o = 0; o < 4; o++) {
+          var scale = freq * Math.pow(2, o);
+          var gw = Math.ceil(W / scale) + 1;
+          var gh = Math.ceil(H / scale) + 1;
+          var rng = mulberry32(seed * 7349 + o * 7919 + 13);
+          var lat = new Float32Array(gw * gh);
+          for (i = 0; i < lat.length; i++) lat[i] = rng();
+          var weight = Math.pow(0.55, o);
+          norm += weight;
+          for (y = 0; y < H; y++) {
+            var fy = y / scale, y0 = Math.floor(fy), ty = smooth(fy - y0);
+            for (x = 0; x < W; x++) {
+              var fx = x / scale, x0 = Math.floor(fx), tx = smooth(fx - x0);
+              var a = lat[y0 * gw + x0], b = lat[y0 * gw + x0 + 1];
+              var c = lat[(y0 + 1) * gw + x0], d = lat[(y0 + 1) * gw + x0 + 1];
+              var v = (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+              arr[y * W + x] += v * weight;
+            }
+          }
+        }
+        for (i = 0; i < arr.length; i++) {
+          var v = arr[i] / norm;
+          v = 0.5 + (v - 0.5) * amp;
+          arr[i] = Math.max(0, Math.min(1, v));
+        }
+        return arr;
+      }
+
+      var C = {
+        deep: [0x1b / 255, 0x4f / 255, 0x72 / 255], water: [0x2e / 255, 0x86 / 255, 0xc1 / 255],
+        sand: [0xe9 / 255, 0xdb / 255, 0x9d / 255], grass: [0x5c / 255, 0xab / 255, 0x4e / 255],
+        forest: [0x3e / 255, 0x8e / 255, 0x41 / 255], rock: [0x8d / 255, 0x7b / 255, 0x68 / 255],
+        snow: [0xee / 255, 0xf2 / 255, 0xf7 / 255]
+      };
+      function cssCol(rgb) { return "rgb(" + Math.round(rgb[0] * 255) + "," + Math.round(rgb[1] * 255) + "," + Math.round(rgb[2] * 255) + ")"; }
+
+      function zoneAt(h, water) {
+        var t = h - water;
+        if (t < -0.1) return "deep";
+        if (t < 0) return "water";
+        if (t < 0.02) return "sand";
+        if (t < 0.22) return "grass";
+        if (t < 0.35) return "forest";
+        if (t < 0.5) return "rock";
+        return "snow";
+      }
+      function isGrass(h, water) { var z = zoneAt(h, water); return z === "grass" || z === "forest"; }
+
+      var STEPS = [
+        { icon: "🎲", title: "Schritt 1: Der Zufall",
+          text: "Alles beginnt mit einer Zahl – dem Seed (englisch für „Saatkorn“). Mit ihr würfelt der Computer lauter zufällige Punkte. Und das Beste: Dieselbe Zahl ergibt immer denselben Zufall!",
+          task: "Drück mehrmals auf 🎲 – jede Zahl ergibt eine andere Welt. Tippe dann dieselbe Zahl nochmal ein: Die Welt sieht exakt gleich aus! In der 3D-Ansicht siehst du den Zufall als zackigen Teppich." },
+        { icon: "〰️", title: "Schritt 2: Weiche Wellen",
+          text: "Die zufälligen Punkte werden in mehreren Runden verwischt und übereinander gelegt – große Wellen plus kleine Wellen plus Mini-Wellen. So entstehen sanfte Höhen. Fachleute nennen das „Noise“ (Rauschen).",
+          task: "Schieb den Regler „Hügel-Größe“ nach links – riesige Gebirge! Nach rechts – viele kleine Buckel. Schau es dir in 3D an!" },
+        { icon: "💧", title: "Schritt 3: Das Wasser",
+          text: "Jetzt kommt die erste Regel: Alles unterhalb der Wasserlinie wird nass! Der Computer prüft für jeden Punkt nur eine Frage: höher oder tiefer als das Wasser?",
+          task: "Stell den Wasserstand hoch – wo versinken die Berge? Bei welchem Stand entsteht ein riesiger See? In 3D steigt das Wasser sichtbar an!" },
+        { icon: "🎨", title: "Schritt 4: Die Farben",
+          text: "Jede Höhe bekommt eine Farbe: tief unten Wasser, am Rand Strand, dann Wiese, dann Fels und ganz oben Schnee. So entsteht aus Zahlen eine Landschaft, die wie von Hand gezeichnet aussieht.",
+          task: "Dreh die Hügel-Höhe hoch – erscheint Schnee auf den Gipfeln? Wechsle jetzt in die 3D-Ansicht und drehe deine Welt einmal rundum! 🌍" },
+        { icon: "🦊", title: "Schritt 5: Regeln für Bewohner",
+          text: "Zuletzt werden Dinge nach Regeln verteilt: Bäume wachsen nur auf Wiese, Karotten als Hasenfutter dazwischen, Steine als Sichtschutz. Der Fuchs sucht sich den Wiesenplatz am Wasser – und die Hasen bauen nicht weit weg. Jedes Mal, wenn du einen Regler bewegst, rechnet der Computer alle Regeln neu!",
+          task: "Erhöhe die Baum-Dichte – warum wachsen keine Bäume im Wasser? Und klicke dann eine Stelle an, um den Fuchs selbst zu platzieren: Wo würde er gut jagen können?" }
+      ];
+
+      var state = { seed: 1337, freq: 9, amp: 1.3, water: 0.42, treeDens: 0.55, stage: 1, foxManual: null, _msg: null };
+      var heights = null, raw = null, world = null;
+
+      function recompute() {
+        heights = buildHeights(state.seed, state.freq, state.amp);
+        raw = buildRaw(state.seed);
+        if (state.stage >= 5) {
+          var rng = mulberry32(state.seed * 9301 + 49297);
+          var trees = [], carrots = [], stones = [], rabbits = [], fox = null, foxT = Infinity, waterCells = 0;
+          for (var y = 0; y < H; y++) {
+            for (var x = 0; x < W; x++) {
+              var h = heights[y * W + x], t = h - state.water;
+              if (t < 0) waterCells++;
+              var r = rng();
+              if (isGrass(h, state.water)) {
+                if (r < state.treeDens * 0.22) {
+                  var ok = true;
+                  for (var k = 0; k < trees.length; k++) {
+                    var p = trees[k];
+                    if ((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) < 5) { ok = false; break; }
+                  }
+                  if (ok) trees.push({ x: x, y: y });
+                } else if (r < state.treeDens * 0.22 + 0.02) {
+                  carrots.push({ x: x, y: y });
+                } else if (r < state.treeDens * 0.22 + 0.028) {
+                  rabbits.push({ x: x, y: y });
+                }
+                if (t > 0.02 && t < foxT) { foxT = t; fox = { x: x, y: y }; }
+              } else if (t >= 0.02 && t < 0.5 && r > 0.994) {
+                stones.push({ x: x, y: y });
+              }
+            }
+          }
+          world = {
+            trees: trees.slice(0, 400), carrots: carrots.slice(0, 80),
+            stones: stones.slice(0, 60), rabbits: rabbits.slice(0, 5), fox: fox,
+            waterPct: Math.round((waterCells / (W * H)) * 100)
+          };
+          if (state.foxManual) world.fox = state.foxManual;
+        } else {
+          world = null;
+        }
+      }
+
+      // ================= 2D-Karte =================
+      function draw2d() {
+        var cvs = document.getElementById("map");
+        cvs.style.cursor = state.stage >= 5 ? "pointer" : "default";
+        var ctx = cvs.getContext("2d");
+        for (var y = 0; y < H; y++) {
+          for (var x = 0; x < W; x++) {
+            var i = y * W + x, h = heights[i], color;
+            if (state.stage === 1) {
+              var g = Math.round(40 + raw[i] * 200);
+              color = "rgb(" + g + "," + g + "," + g + ")";
+            } else if (state.stage === 2) {
+              var g2 = Math.round(30 + h * 205);
+              color = "rgb(" + g2 + "," + g2 + "," + g2 + ")";
+            } else if (state.stage === 3) {
+              color = h < state.water ? (h < state.water - 0.1 ? cssCol(C.deep) : cssCol(C.water)) : "#9ec77e";
+            } else {
+              color = cssCol(C[zoneAt(h, state.water)]);
+            }
+            ctx.fillStyle = color;
+            ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+          }
+        }
+        if (state.stage >= 5 && world) {
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.font = "9px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+          world.stones.forEach(function (p) { ctx.fillText("🪨", p.x * CELL + CELL / 2, p.y * CELL + CELL / 2); });
+          world.carrots.forEach(function (p) { ctx.fillText("🥕", p.x * CELL + CELL / 2, p.y * CELL + CELL / 2); });
+          world.trees.forEach(function (p) { ctx.fillText("🌲", p.x * CELL + CELL / 2, p.y * CELL + CELL / 2); });
+          ctx.font = "11px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+          world.rabbits.forEach(function (p) { ctx.fillText("🐰", p.x * CELL + CELL / 2, p.y * CELL + CELL / 2); });
+          if (world.fox) {
+            ctx.font = "13px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+            ctx.fillText("🦊", world.fox.x * CELL + CELL / 2, world.fox.y * CELL + CELL / 2);
+          }
+        }
+      }
+
+      // ================= 3D-Welt (WebGL, ohne Bibliotheken) =================
+      var mode3d = false;
+      var gl = null, glc = null, glReady = false, rafId = 0;
+      var progT = null, progW = null, progP = null;
+      var bufT = null, bufW = null, nT = 0, nW = 6;
+      var objG = null;
+      var WORLDH = 7, FOV = 50 * Math.PI / 180, TARGETY = 3;
+      var cam = { yaw: 0.75, pitch: 0.5, dist: 85, userMoved: false };
+      var EMOJI = [
+        { key: "stones", ch: "🪨", size: 2.6 },
+        { key: "carrots", ch: "🥕", size: 2.2 },
+        { key: "trees", ch: "🌲", size: 3.2 },
+        { key: "rabbits", ch: "🐰", size: 3.4 },
+        { key: "fox", ch: "🦊", size: 4.2 }
+      ];
+
+      function cross3(a, b) {
+        return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      }
+      function norm3(a) {
+        var l = Math.hypot(a[0], a[1], a[2]) || 1;
+        return [a[0] / l, a[1] / l, a[2] / l];
+      }
+      function mat4Persp(fovy, aspect, near, far) {
+        var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+        return new Float32Array([
+          f / aspect, 0, 0, 0,
+          0, f, 0, 0,
+          0, 0, (far + near) * nf, -1,
+          0, 0, 2 * far * near * nf, 0
+        ]);
+      }
+      function mat4LookAt(e, c, up) {
+        var z = norm3([e[0] - c[0], e[1] - c[1], e[2] - c[2]]);
+        var x = norm3(cross3(up, z));
+        var y = cross3(z, x);
+        return new Float32Array([
+          x[0], y[0], z[0], 0,
+          x[1], y[1], z[1], 0,
+          x[2], y[2], z[2], 0,
+          -(x[0] * e[0] + x[1] * e[1] + x[2] * e[2]),
+          -(y[0] * e[0] + y[1] * e[1] + y[2] * e[2]),
+          -(z[0] * e[0] + z[1] * e[1] + z[2] * e[2]), 1
+        ]);
+      }
+      function mat4Mul(a, b) {
+        var o = new Float32Array(16);
+        for (var c2 = 0; c2 < 4; c2++) for (var r = 0; r < 4; r++) {
+          o[c2 * 4 + r] = a[r] * b[c2 * 4] + a[4 + r] * b[c2 * 4 + 1] +
+            a[8 + r] * b[c2 * 4 + 2] + a[12 + r] * b[c2 * 4 + 3];
+        }
+        return o;
+      }
+      function camEye() {
+        var cp = Math.cos(cam.pitch);
+        return [Math.cos(cam.yaw) * cam.dist * cp, TARGETY + Math.sin(cam.pitch) * cam.dist,
+                Math.sin(cam.yaw) * cam.dist * cp];
+      }
+
+      function makeShader(type, src) {
+        var s = gl.createShader(type);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        return s;
+      }
+      function makeProg(vs, fs, attrs, unis) {
+        var p = gl.createProgram();
+        gl.attachShader(p, makeShader(gl.VERTEX_SHADER, vs));
+        gl.attachShader(p, makeShader(gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(p);
+        attrs.forEach(function (a) { p[a] = gl.getAttribLocation(p, a); });
+        unis.forEach(function (u) { p[u] = gl.getUniformLocation(p, u); });
+        return p;
+      }
+
+      function emojiTexture(ch) {
+        var cv = document.createElement("canvas");
+        cv.width = cv.height = 64;
+        var c2 = cv.getContext("2d");
+        c2.font = "52px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+        c2.textAlign = "center"; c2.textBaseline = "middle";
+        c2.fillText(ch, 32, 36);
+        var tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return tex;
+      }
+
+      function height01At(gx, gz) {
+        gx = Math.max(0, Math.min(W - 1, gx)); gz = Math.max(0, Math.min(H - 1, gz));
+        if (state.stage === 1) return raw[Math.round(gz) * W + Math.round(gx)];
+        return heights[Math.round(gz) * W + Math.round(gx)];
+      }
+      function corner3(gx, gz) {
+        return [gx - W / 2, height01At(gx, gz) * WORLDH, gz - H / 2];
+      }
+      function hash01(x, z) {
+        var h = (x * 374761393 + z * 668265263 + state.seed * 1274126177) | 0;
+        h = ((h ^ (h >> 13)) * 1274126177) | 0;
+        return ((h ^ (h >> 16)) & 0x7fffffff) / 2147483647;
+      }
+      function faceColor3(avgH, gx, gz) {
+        var col;
+        if (state.stage <= 2) {
+          var g = avgH * 0.75 + 0.15;
+          col = [g, g, g];
+        } else if (state.stage === 3) {
+          col = avgH < state.water ? (avgH < state.water - 0.1 ? C.deep : C.water) : [0.62, 0.78, 0.49];
+        } else {
+          col = C[zoneAt(avgH, state.water)].slice();
+        }
+        var j = 1 - hash01(gx, gz) * 0.08;
+        return [col[0] * j, col[1] * j, col[2] * j];
+      }
+
+      function build3D() {
+        if (!glReady) return;
+        var arr = new Float32Array(W * H * 6 * 6);
+        var n = 0;
+        for (var gz = 0; gz < H; gz++) {
+          for (var gx = 0; gx < W; gx++) {
+            var c0 = corner3(gx, gz), c1 = corner3(gx + 1, gz);
+            var c2 = corner3(gx, gz + 1), c3 = corner3(gx + 1, gz + 1);
+            var avgH = (c0[1] + c1[1] + c2[1] + c3[1]) / 4 / WORLDH;
+            var col = faceColor3(avgH, gx, gz);
+            var tris = [c0, c2, c1, c2, c3, c1];
+            for (var k = 0; k < 6; k++) {
+              arr[n++] = tris[k][0]; arr[n++] = tris[k][1]; arr[n++] = tris[k][2];
+              arr[n++] = col[0]; arr[n++] = col[1]; arr[n++] = col[2];
+            }
+          }
+        }
+        nT = W * H * 6;
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufT);
+        gl.bufferData(gl.ARRAY_BUFFER, arr, gl.DYNAMIC_DRAW);
+
+        // Wasserfläche
+        var wy = state.water * WORLDH - 0.04, hw = W / 2, hd = H / 2;
+        var wv = new Float32Array([
+          -hw, wy, -hd, -hw, wy, hd, hw, wy, -hd,
+          -hw, wy, hd, hw, wy, hd, hw, wy, -hd
+        ]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufW);
+        gl.bufferData(gl.ARRAY_BUFFER, wv, gl.DYNAMIC_DRAW);
+
+        // Bewohner als Billboard-Punkte
+        EMOJI.forEach(function (e) {
+          var list = world ? world[e.key] : [];
+          if (e.key === "fox") list = world && world.fox ? [world.fox] : [];
+          var pos = new Float32Array(list.length * 3);
+          var sizes = { stones: 0.5, carrots: 0.4, trees: 0.6, rabbits: 0.8, fox: 1.2 };
+          for (var i = 0; i < list.length; i++) {
+            var p = list[i];
+            pos[i * 3] = p.x - W / 2 + 0.5;
+            pos[i * 3 + 1] = height01At(p.x, p.y) * WORLDH + sizes[e.key];
+            pos[i * 3 + 2] = p.y - H / 2 + 0.5;
+          }
+          objG[e.key].n = list.length;
+          gl.bindBuffer(gl.ARRAY_BUFFER, objG[e.key].buf);
+          gl.bufferData(gl.ARRAY_BUFFER, pos, gl.DYNAMIC_DRAW);
+        });
+      }
+
+      function initGL() {
+        glc = document.getElementById("map3d");
+        gl = glc.getContext("webgl", { antialias: true }) || glc.getContext("experimental-webgl");
+        if (!gl) {
+          document.getElementById("clickMsg").className = "clickmsg bad";
+          document.getElementById("clickMsg").textContent = " 😢 Dein Browser unterstützt WebGL nicht – nutze einfach die 2D-Karte weiter!";
+          setMode(false);
+          return;
+        }
+        progT = makeProg(
+          "attribute vec3 aPos; attribute vec3 aCol; uniform mat4 uMVP; varying vec3 vCol;" +
+          "void main(){ gl_Position = uMVP * vec4(aPos,1.0); vCol = aCol; }",
+          "precision mediump float; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol,1.0); }",
+          ["aPos", "aCol"], ["uMVP"]);
+        progW = makeProg(
+          "attribute vec3 aPos; uniform mat4 uMVP; void main(){ gl_Position = uMVP * vec4(aPos,1.0); }",
+          "precision mediump float; uniform vec4 uColor; void main(){ gl_FragColor = uColor; }",
+          ["aPos"], ["uMVP", "uColor"]);
+        progP = makeProg(
+          "attribute vec3 aPos; uniform mat4 uMVP; uniform float uScale;" +
+          "void main(){ vec4 p = uMVP * vec4(aPos,1.0); gl_Position = p;" +
+          " gl_PointSize = clamp(uScale / max(p.w, 0.1), 3.0, 110.0); }",
+          "precision mediump float; uniform sampler2D uTex; void main(){" +
+          " vec4 c = texture2D(uTex, gl_PointCoord); if (c.a < 0.15) discard;" +
+          " gl_FragColor = vec4(c.rgb, 1.0); }",
+          ["aPos"], ["uMVP", "uScale", "uTex"]);
+
+        bufT = gl.createBuffer(); bufW = gl.createBuffer();
+        objG = {};
+        EMOJI.forEach(function (e) {
+          objG[e.key] = { buf: gl.createBuffer(), tex: emojiTexture(e.ch), n: 0, size: e.size };
+        });
+        gl.enable(gl.DEPTH_TEST);
+        glReady = true;
+        build3D();
+        attach3DControls();
+        if (!rafId) rafId = requestAnimationFrame(render3d);
+      }
+
+      function resizeGL() {
+        var w = glc.clientWidth, h = glc.clientHeight;
+        if (glc.width !== w || glc.height !== h) { glc.width = w; glc.height = h; }
+        gl.viewport(0, 0, w, h);
+      }
+
+      function render3d() {
+        rafId = 0;
+        if (!mode3d) return;
+        rafId = requestAnimationFrame(render3d);
+        if (!glReady) return;
+        if (!cam.userMoved) cam.yaw += 0.0022;
+        resizeGL();
+        var eye = camEye();
+        var view = mat4LookAt(eye, [0, TARGETY, 0], [0, 1, 0]);
+        var proj = mat4Persp(FOV, glc.width / glc.height, 0.5, 600);
+        var mvp = mat4Mul(proj, view);
+
+        gl.clearColor(0.75, 0.87, 0.96, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // 1) Terrain
+        gl.useProgram(progT);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufT);
+        gl.enableVertexAttribArray(progT.aPos);
+        gl.enableVertexAttribArray(progT.aCol);
+        gl.vertexAttribPointer(progT.aPos, 3, gl.FLOAT, false, 24, 0);
+        gl.vertexAttribPointer(progT.aCol, 3, gl.FLOAT, false, 24, 12);
+        gl.uniformMatrix4fv(progT.uMVP, false, mvp);
+        gl.drawArrays(gl.TRIANGLES, 0, nT);
+        gl.disableVertexAttribArray(progT.aCol);
+
+        // 2) Wasser (halbtransparent, ab Schritt 3)
+        if (state.stage >= 3) {
+          gl.useProgram(progW);
+          gl.bindBuffer(gl.ARRAY_BUFFER, bufW);
+          gl.enableVertexAttribArray(progW.aPos);
+          gl.vertexAttribPointer(progW.aPos, 3, gl.FLOAT, false, 0, 0);
+          gl.uniformMatrix4fv(progW.uMVP, false, mvp);
+          gl.uniform4f(progW.uColor, 0.18, 0.53, 0.76, 0.72);
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          gl.depthMask(false);
+          gl.drawArrays(gl.TRIANGLES, 0, nW);
+          gl.depthMask(true);
+          gl.disable(gl.BLEND);
+        }
+
+        // 3) Bewohner (Emoji-Billboards)
+        if (state.stage >= 5 && world) {
+          gl.useProgram(progP);
+          gl.enableVertexAttribArray(progP.aPos);
+          gl.vertexAttribPointer(progP.aPos, 3, gl.FLOAT, false, 0, 0);
+          gl.uniformMatrix4fv(progP.uMVP, false, mvp);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.uniform1i(progP.uTex, 0);
+          var scaleBase = glc.height / (2 * Math.tan(FOV / 2));
+          EMOJI.forEach(function (e) {
+            var o = objG[e.key];
+            if (!o.n) return;
+            gl.bindBuffer(gl.ARRAY_BUFFER, o.buf);
+            gl.vertexAttribPointer(progP.aPos, 3, gl.FLOAT, false, 0, 0);
+            gl.bindTexture(gl.TEXTURE_2D, o.tex);
+            gl.uniform1f(progP.uScale, o.size * scaleBase);
+            gl.drawArrays(gl.POINTS, 0, o.n);
+          });
+        }
+      }
+
+      // Höhe an Weltposition (bilinear, fürs Klicken)
+      function sampleH(wx, wz) {
+        var gx = wx + W / 2, gz = wz + H / 2;
+        if (gx < 0 || gx >= W - 1 || gz < 0 || gz >= H - 1) return null;
+        var x0 = Math.floor(gx), z0 = Math.floor(gz), fx = gx - x0, fz = gz - z0;
+        var a = heights[z0 * W + x0], b = heights[z0 * W + x0 + 1];
+        var c = heights[(z0 + 1) * W + x0], d = heights[(z0 + 1) * W + x0 + 1];
+        return (a + (b - a) * fx) * (1 - fz) + (c + (d - c) * fx) * fz;
+      }
+
+      // Klick → Strahl → Treffer am Gelände oder Wasser
+      function pick3D(cx, cy) {
+        var rect = glc.getBoundingClientRect();
+        var aspect = rect.width / rect.height;
+        var ndcX = ((cx - rect.left) / rect.width) * 2 - 1;
+        var ndcY = 1 - ((cy - rect.top) / rect.height) * 2;
+        var eye = camEye(), center = [0, TARGETY, 0];
+        var f = norm3([center[0] - eye[0], center[1] - eye[1], center[2] - eye[2]]);
+        var r = norm3(cross3(f, [0, 1, 0]));
+        var u = cross3(r, f);
+        var tf = Math.tan(FOV / 2);
+        var dir = norm3([
+          f[0] + r[0] * ndcX * tf * aspect + u[0] * ndcY * tf,
+          f[1] + r[1] * ndcX * tf * aspect + u[1] * ndcY * tf,
+          f[2] + r[2] * ndcX * tf * aspect + u[2] * ndcY * tf
+        ]);
+        var waterY = state.water * WORLDH - 0.04;
+        var dt = 0.35, last = 0;
+        for (var tt = 1; tt < 500; tt += dt) {
+          var px = eye[0] + dir[0] * tt, py = eye[1] + dir[1] * tt, pz = eye[2] + dir[2] * tt;
+          if (px < -W / 2 || px > W / 2 || pz < -H / 2 || pz > H / 2) { if (py < -4) break; last = tt; continue; }
+          var h = sampleH(px, pz);
+          if (h !== null && py <= h * WORLDH) {
+            var lo = last, hi = tt;
+            for (var k = 0; k < 14; k++) {
+              var mid = (lo + hi) / 2;
+              var my = eye[1] + dir[1] * mid;
+              var mh = sampleH(eye[0] + dir[0] * mid, eye[2] + dir[2] * mid);
+              if (mh !== null && my <= mh * WORLDH) hi = mid; else lo = mid;
+            }
+            var ft = (lo + hi) / 2;
+            // Liegt Wasser zwischen Kamera und Treffer?
+            if (dir[1] < -0.0001) {
+              var tw = (eye[1] - waterY) / (-dir[1]);
+              if (tw > 0 && tw < ft) {
+                var wx = eye[0] + dir[0] * tw, wz = eye[2] + dir[2] * tw;
+                var wh = sampleH(wx, wz);
+                if (wh !== null && wh < state.water) return { kind: "water" };
+              }
+            }
+            var fx2 = eye[0] + dir[0] * ft, fz2 = eye[2] + dir[2] * ft;
+            return { kind: "terrain", h: sampleH(fx2, fz2), x: fx2 + W / 2, z: fz2 + H / 2 };
+          }
+          last = tt;
+        }
+        return null;
+      }
+
+      function click3D(e) {
+        if (state.stage < 5) return;
+        var hit = pick3D(e.clientX, e.clientY);
+        if (!hit) return;
+        if (hit.kind === "terrain") {
+          var z = zoneAt(hit.h, state.water);
+          if (z === "grass" || z === "forest") {
+            state.foxManual = { x: Math.floor(hit.x), y: Math.floor(hit.z) };
+            state._msg = { text: "🦊 Der Fuchs hat einen neuen Lieblingsplatz! Von hier behält er sein Revier im Blick.", cls: "ok" };
+          } else if (z === "water" || z === "deep") {
+            state._msg = { text: "💦 Ups, da ist Wasser – Füchse schwimmen nicht so gern. Such eine grüne Wiese!", cls: "bad" };
+          } else {
+            state._msg = { text: "🪨 Zu steinig oder zu kalt hier oben – der Fuchs jagt lieber auf der Wiese!", cls: "bad" };
+          }
+        } else if (hit.kind === "water") {
+          state._msg = { text: "💦 Ups, da ist Wasser – Füchse schwimmen nicht so gern. Such eine grüne Wiese!", cls: "bad" };
+        }
+        update();
+      }
+
+      function attach3DControls() {
+        var drag = null;
+        function down(x, y) {
+          drag = { x: x, y: y, moved: false };
+          cam.userMoved = true;
+          glc.classList.add("dragging");
+        }
+        function move(x, y) {
+          if (!drag) return;
+          var dx = x - drag.x, dy = y - drag.y;
+          if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+          cam.yaw += dx * 0.006;
+          cam.pitch = Math.max(0.15, Math.min(1.45, cam.pitch + dy * 0.005));
+          drag.x = x; drag.y = y;
+        }
+        function up(x, y) {
+          if (!drag) return;
+          var wasClick = !drag.moved;
+          drag = null;
+          glc.classList.remove("dragging");
+          if (wasClick) { var me = { clientX: x, clientY: y }; click3D(me); }
+        }
+        glc.addEventListener("mousedown", function (e) { down(e.clientX, e.clientY); });
+        window.addEventListener("mousemove", function (e) { move(e.clientX, e.clientY); });
+        window.addEventListener("mouseup", function (e) { up(e.clientX, e.clientY); });
+        glc.addEventListener("wheel", function (e) {
+          e.preventDefault();
+          cam.userMoved = true;
+          cam.dist = Math.max(28, Math.min(240, cam.dist * (e.deltaY > 0 ? 1.08 : 0.93)));
+        }, { passive: false });
+        var t = null;
+        glc.addEventListener("touchstart", function (e) {
+          if (e.touches.length === 1) { t = e.touches[0]; down(t.clientX, t.clientY); }
+        }, { passive: true });
+        glc.addEventListener("touchmove", function (e) {
+          if (t && e.touches.length === 1) { t = e.touches[0]; move(t.clientX, t.clientY); }
+        }, { passive: true });
+        glc.addEventListener("touchend", function (e) {
+          if (t) { up(t.clientX, t.clientY); t = null; }
+        });
+      }
+
+      function setMode(m3d) {
+        mode3d = m3d;
+        document.getElementById("map").classList.toggle("hidden", m3d);
+        glc = document.getElementById("map3d");
+        glc.classList.toggle("hidden", !m3d);
+        document.getElementById("ctrlHint").classList.toggle("hidden", !m3d);
+        document.getElementById("btn2d").classList.toggle("active", !m3d);
+        document.getElementById("btn3d").classList.toggle("active", m3d);
+        if (m3d) {
+          if (!glReady) initGL();
+          else if (!rafId) rafId = requestAnimationFrame(render3d);
+        }
+      }
+
+      // ================= UI =================
+      function renderSteps() {
+        var box = document.getElementById("steps");
+        box.innerHTML = "";
+        STEPS.forEach(function (s, i) {
+          var b = document.createElement("button");
+          b.className = "stepbtn" + (state.stage === i + 1 ? " active" : "");
+          b.innerHTML = "<span>" + s.icon + "</span><span>Schritt " + (i + 1) + "</span>";
+          b.onclick = function () { state.stage = i + 1; update(); };
+          box.appendChild(b);
+        });
+      }
+
+      function renderExplanation() {
+        var s = STEPS[state.stage - 1];
+        document.getElementById("explIcon").textContent = s.icon;
+        document.getElementById("explTitle").textContent = s.title;
+        document.getElementById("explText").textContent = s.text;
+        document.getElementById("explTask").innerHTML = "<strong>🔍 Probier es aus: </strong>" + s.task;
+        var area = document.getElementById("nextArea");
+        if (state.stage < 5) {
+          area.innerHTML = '<button class="next" id="nextBtn">Weiter zu Schritt ' + (state.stage + 1) + " " + STEPS[state.stage].icon + " ▶</button>";
+          document.getElementById("nextBtn").onclick = function () { state.stage++; update(); };
+        } else {
+          area.innerHTML = '<span class="done">🎉 Fertig – du bist jetzt Weltengestalter:in!</span>';
+        }
+        document.getElementById("legendCard").className = state.stage >= 4 ? "card" : "card hidden";
+        var countsCard = document.getElementById("countsCard");
+        countsCard.className = state.stage >= 5 ? "card" : "card hidden";
+        if (state.stage >= 5 && world) {
+          document.getElementById("counts").innerHTML =
+            "<li>🌲 " + world.trees.length + " Bäume</li>" +
+            "<li>🥕 " + world.carrots.length + " Karotten</li>" +
+            "<li>🪨 " + world.stones.length + " Steine</li>" +
+            "<li>🐰 " + world.rabbits.length + " Hasen</li>" +
+            "<li>🦊 " + (world.fox ? "1 Fuchs " + (state.foxManual ? "(von dir platziert!)" : "(am Wasser!)") : "kein Wiesenplatz für den Fuchs – senke den Wasserstand!") + "</li>" +
+            "<li>🌊 " + world.waterPct + " % der Welt ist Wasser</li>";
+        }
+        var msgBox = document.getElementById("clickMsg");
+        if (state.stage >= 5) {
+          var m = state._msg;
+          if (!m && state.foxManual) {
+            var fh = height01At(state.foxManual.x, state.foxManual.y);
+            if (!isGrass(fh, state.water)) {
+              m = { text: "🌊 Ups – dein Fuchs-Platz ist jetzt nass oder zu steinig! Klick auf eine neue Wiese.", cls: "bad" };
+            }
+          }
+          if (!m) m = { text: "🖱️ Tipp: Klicke auf die Karte (2D) oder die Landschaft (3D), um den Fuchs selbst zu platzieren – er braucht eine grüne Wiese!", cls: "" };
+          msgBox.className = "clickmsg " + m.cls;
+          msgBox.textContent = m.text;
+          state._msg = null;
+        } else {
+          msgBox.className = "clickmsg hidden";
+        }
+        document.getElementById("autoFoxBtn").className = (state.stage >= 5 && state.foxManual) ? "autofox" : "autofox hidden";
+      }
+
+      function renderLegend() {
+        var items = [
+          ["Tiefes Wasser", C.deep], ["Wasser", C.water], ["Strand", C.sand],
+          ["Wiese", C.grass], ["Wald-Wiese", C.forest], ["Fels", C.rock], ["Schnee", C.snow]
+        ];
+        var box = document.getElementById("legend");
+        box.innerHTML = "";
+        items.forEach(function (it) {
+          var d = document.createElement("div");
+          d.innerHTML = '<span class="sw" style="background:' + cssCol(it[1]) + '"></span>' + it[0];
+          box.appendChild(d);
+        });
+      }
+
+      function fmtFreq(v) { return v <= 8 ? "Gebirge" : v <= 15 ? "Hügelland" : "Buckelwald"; }
+      function fmtAmp(v) { return v <= 0.7 ? "flach" : v <= 1.6 ? "hügelig" : "Alpen"; }
+
+      function renderValues() {
+        document.getElementById("vFreq").textContent = fmtFreq(state.freq);
+        document.getElementById("vAmp").textContent = fmtAmp(state.amp);
+        document.getElementById("vWater").textContent = Math.round(state.water * 100) + " %";
+        document.getElementById("vTree").textContent = Math.round(state.treeDens * 100) + " %";
+      }
+
+      function update() {
+        recompute();
+        draw2d();
+        build3D();
+        renderSteps();
+        renderExplanation();
+        renderValues();
+      }
+
+      document.getElementById("seedInput").addEventListener("input", function (e) {
+        var n = parseInt(e.target.value, 10);
+        if (!isNaN(n) && n > 0) { state.seed = n; state.foxManual = null; update(); }
+      });
+      document.getElementById("dice").addEventListener("click", function () {
+        var s = Math.floor(Math.random() * 99999) + 1;
+        state.seed = s;
+        state.foxManual = null;
+        document.getElementById("seedInput").value = s;
+        update();
+      });
+      document.getElementById("sFreq").addEventListener("input", function (e) { state.freq = parseFloat(e.target.value); update(); });
+      document.getElementById("sAmp").addEventListener("input", function (e) { state.amp = parseFloat(e.target.value); update(); });
+      document.getElementById("sWater").addEventListener("input", function (e) { state.water = parseFloat(e.target.value); update(); });
+      document.getElementById("sTree").addEventListener("input", function (e) { state.treeDens = parseFloat(e.target.value); update(); });
+
+      document.getElementById("map").addEventListener("click", function (e) {
+        if (state.stage < 5) return;
+        var rect = this.getBoundingClientRect();
+        var x = Math.floor((e.clientX - rect.left) / rect.width * W);
+        var y = Math.floor((e.clientY - rect.top) / rect.height * H);
+        x = Math.max(0, Math.min(W - 1, x));
+        y = Math.max(0, Math.min(H - 1, y));
+        var h = heights[y * W + x];
+        if (isGrass(h, state.water)) {
+          state.foxManual = { x: x, y: y };
+          state._msg = { text: "🦊 Der Fuchs hat einen neuen Lieblingsplatz! Von hier behält er sein Revier im Blick.", cls: "ok" };
+        } else if (h < state.water) {
+          state._msg = { text: "💦 Ups, da ist Wasser – Füchse schwimmen nicht so gern. Such eine grüne Wiese!", cls: "bad" };
+        } else {
+          state._msg = { text: "🪨 Zu steinig oder zu kalt hier oben – der Fuchs jagt lieber auf der Wiese!", cls: "bad" };
+        }
+        update();
+      });
+      document.getElementById("autoFoxBtn").addEventListener("click", function () {
+        state.foxManual = null;
+        state._msg = { text: "🦊 Der Computer wählt jetzt wieder automatisch einen Platz am Wasser für den Fuchs.", cls: "" };
+        update();
+      });
+      document.getElementById("btn2d").addEventListener("click", function () { setMode(false); });
+      document.getElementById("btn3d").addEventListener("click", function () { setMode(true); });
+
+      renderLegend();
+      update();
+    </script>
+  </body>
+</html>
